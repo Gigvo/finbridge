@@ -2,8 +2,10 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 
 const { registerHandler, loginHandler, meHandler } = require('./auth');
+const { getAuth, getDb } = require('./firebase');
 const { extractReceiptAmountFromImage, computeUmkmKpi } = require('./gemini');
 
 const app = express();
@@ -20,6 +22,31 @@ app.use(cors({
 // Base64 image payloads can be > 1MB
 app.use(express.json({ limit: '15mb' }));
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }
+});
+
+function getBearerToken(req) {
+  const header = String(req.headers?.authorization ?? '');
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+  return token;
+}
+
+async function requireFirebaseUser(req) {
+  const token = getBearerToken(req);
+  if (!token) {
+    const err = new Error('Unauthorized');
+    err.code = 'UNAUTHORIZED';
+    throw err;
+  }
+
+  const auth = getAuth();
+  const decoded = await auth.verifyIdToken(token);
+  return decoded;
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
@@ -29,15 +56,52 @@ app.post('/api/auth/login', loginHandler);
 app.get('/api/auth/me', meHandler);
 
 // Gemini AI
-app.post('/api/ai/receipt-amount', async (req, res, next) => {
+// Receipt endpoint supports:
+// - application/json: { mimeType, imageBase64, currency }
+// - multipart/form-data: fields { image: <file>, currency }
+// It also persists extracted amount to Firestore.
+app.post('/api/ai/receipt-amount', upload.single('image'), async (req, res, next) => {
   try {
-    const { imageBase64, mimeType, currency } = req.body || {};
+    const decoded = await requireFirebaseUser(req);
+    const uid = decoded.sub;
+
+    const currency = String(req.body?.currency || 'IDR');
+
+    let base64Data;
+    let mimeType;
+    let source = 'json';
+
+    if (req.file) {
+      source = 'multipart';
+      mimeType = req.file.mimetype;
+      base64Data = req.file.buffer.toString('base64');
+    } else {
+      const { imageBase64 } = req.body || {};
+      mimeType = req.body?.mimeType;
+      base64Data = imageBase64;
+    }
+
     const out = await extractReceiptAmountFromImage({
-      base64Data: imageBase64,
+      base64Data,
       mimeType,
       currency
     });
-    res.json(out);
+
+    const db = getDb();
+    const createdAt = new Date().toISOString();
+    const doc = {
+      uid,
+      amount: out.amount ?? null,
+      currency: out.currency || currency,
+      confidence: out.confidence ?? null,
+      notes: out.notes || '',
+      mimeType: mimeType || null,
+      source,
+      createdAt
+    };
+
+    const ref = await db.collection('receiptExtractions').add(doc);
+    res.json({ receiptId: ref.id, ...out });
   } catch (e) {
     next(e);
   }
@@ -57,7 +121,10 @@ app.use((err, req, res, next) => {
   // eslint-disable-next-line no-console
   console.error(err);
 
-  const status = err?.code === 'BAD_INPUT' ? 400 : 500;
+  const status =
+    err?.code === 'BAD_INPUT' ? 400 :
+      err?.code === 'UNAUTHORIZED' ? 401 :
+        500;
   res.status(status).json({
     message: err?.message || 'Internal server error',
     code: err?.code || 'INTERNAL_ERROR'

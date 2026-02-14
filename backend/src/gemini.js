@@ -136,7 +136,7 @@ async function computeUmkmKpi({ umkm = {}, signals = {}, currency = 'IDR' }) {
 
   const prompt = [
     'Kamu adalah analis risiko & performa UMKM berbasis sinyal non-konvensional.',
-    'Hitung KPI komposit (0-100) dan breakdown KPI berdasarkan sinyal yang diberikan.',
+    'Hitung KPI komposit (0-900) dan breakdown KPI berdasarkan sinyal yang diberikan.',
     'Keluarkan hanya JSON dengan schema berikut:',
     '{',
     '  "kpiScore": number,',
@@ -145,7 +145,7 @@ async function computeUmkmKpi({ umkm = {}, signals = {}, currency = 'IDR' }) {
     '  "recommendedActions": string[]',
     '}',
     'Constraints:',
-    '- score 0-100; weight 0-1; total weight harus ~1',
+    '- score 0-900; weight 0-1; total weight harus ~1',
     '- Jangan buat data baru di luar input; jika sinyal kurang, jelaskan di insights',
     '- Fokus pada sinyal: tagihan (ketepatan pembayaran), penggunaan ewallet, stabilitas transaksi, dsb.',
     '',

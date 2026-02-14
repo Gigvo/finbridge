@@ -4,13 +4,13 @@ Backend ada di folder `backend/` (terpisah dari Next.js di `frontend/`).
 
 ## Auth (Firebase)
 
-Backend ini pakai **Firebase Auth** (email+password) dan **Firestore** untuk menyimpan profil + mapping `nik`.
+Backend ini pakai **Firebase Auth** dan **Firestore** untuk menyimpan profil + mapping `nik`.
 
-- Register: `POST /api/auth/register` dengan `nik`, `email`, `password`
-- Login helper: `POST /api/auth/login` dengan `nik` (mengembalikan `email`)
+- Register: `POST /api/auth/register` dengan `fullName`, `nik`, `phone`, `email` (opsional)
+- Login helper: `POST /api/auth/login` dengan `nik` (mengembalikan `email` dan `phone`)
 - Me: `GET /api/auth/me` dengan header `Authorization: Bearer <Firebase ID Token>`
 
-Catatan: Verifikasi password dilakukan oleh **Firebase Client SDK** (di frontend), bukan oleh backend.
+Catatan: Autentikasi dilakukan via **Firebase Phone Auth (OTP)** di frontend. Backend tidak menerima password.
 
 ## Menjalankan
 
@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Default jalan di `http://localhost:4000`.
+Default jalan di `http://localhost:4010` (lihat `backend/.env`).
 
 ## Contoh request
 
@@ -39,7 +39,7 @@ Register:
 ```bash
 curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"nik\":\"1234567890123456\",\"email\":\"user@example.com\",\"password\":\"password123\"}"
+  -d "{\"fullName\":\"Budi Santoso\",\"nik\":\"1234567890123456\",\"phone\":\"081234567890\",\"email\":\"user@example.com\"}"
 ```
 
 Login:
@@ -70,6 +70,14 @@ Tambahkan `GEMINI_API_KEY` di `.env` backend.
 
 `POST /api/ai/receipt-amount`
 
+Endpoint ini:
+- menerima gambar (base64 JSON atau upload file form-data),
+- mengirim gambar ke Gemini,
+- menyimpan hasil `amount` ke Firestore collection `receiptExtractions`,
+- mengembalikan `receiptId` + hasil ekstraksi.
+
+Auth: wajib header `Authorization: Bearer <Firebase ID Token>`.
+
 Body JSON:
 
 ```json
@@ -80,10 +88,14 @@ Body JSON:
 }
 ```
 
+Atau multipart/form-data (Postman):
+- key `image` (type: File)
+- key `currency` (type: Text, optional)
+
 Response (contoh):
 
 ```json
-{ "amount": 125000, "currency": "IDR", "confidence": 0.86, "notes": "" }
+{ "receiptId": "abc123", "amount": 125000, "currency": "IDR", "confidence": 0.86, "notes": "" }
 ```
 
 Catatan: `imageBase64` adalah base64 murni (tanpa `data:image/...;base64,`).
@@ -105,3 +117,10 @@ Body JSON (contoh):
   "currency": "IDR"
 }
 ```
+
+## Postman Import
+
+- Import OpenAPI: [docs/openapi.json](docs/openapi.json)
+- Import Postman Collection: [docs/postman_collection.json](docs/postman_collection.json)
+
+Set variable `baseUrl` ke `http://localhost:4010` (atau sesuai `PORT`).
