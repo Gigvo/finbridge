@@ -5,20 +5,23 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth'
-import { auth } from '../../../../../lib/firebase'
+import { auth, db } from '../../../../../lib/firebase'
+import { doc, setDoc } from 'firebase/firestore'
 
 export default function RegisterPage() {
     const { register, handleSubmit } = useForm()
     const [loading, setLoading] = useState(false)
     const router = useRouter()
+    const [formData, setFormData] = useState(null)
 
     const onSubmit = async (data) => {
         try {
             setLoading(true)
 
+            sessionStorage.setItem('registerData', JSON.stringify(data))
+
             let phone = data.handphone.trim()
 
-            // Normalisasi nomor Indonesia
             if (phone.startsWith('0')) {
                 phone = '+62' + phone.slice(1)
             } else if (phone.startsWith('62')) {
@@ -42,10 +45,8 @@ export default function RegisterPage() {
                 window.recaptchaVerifier,
             )
 
-            // Simpan confirmationResult sementara di window
             window.confirmationResult = result
 
-            alert('OTP berhasil dikirim')
             router.push('/user/auth/otp')
         } catch (error) {
             console.error(error)

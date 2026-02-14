@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from '../../../../../lib/firebase'
 
 export default function OtpPage() {
     const [otp, setOtp] = useState('')
@@ -10,23 +12,40 @@ export default function OtpPage() {
 
     const verifyOtp = async () => {
         try {
+            setLoading(true)
+
             if (!window.confirmationResult) {
                 alert('Session OTP tidak ditemukan')
                 return
             }
 
-            setLoading(true)
-
             const result = await window.confirmationResult.confirm(otp)
             const user = result.user
 
-            console.log('Login sukses:', user.uid)
+            // Ambil data dari sessionStorage
+            const storedData = JSON.parse(
+                sessionStorage.getItem('registerData'),
+            )
 
-            alert('Verifikasi berhasil')
+            if (!storedData) {
+                alert('Data registrasi tidak ditemukan')
+                return
+            }
+
+            await setDoc(doc(db, 'users', user.uid), {
+                fullName: storedData.firstName,
+                nik: storedData.lastName,
+                email: storedData.email || '',
+                phone: user.phoneNumber,
+                createdAt: new Date(),
+            })
+
+            sessionStorage.removeItem('registerData')
+
             router.push('/dashboard')
         } catch (error) {
             console.error(error)
-            alert('Kode OTP salah')
+            alert('OTP salah atau gagal menyimpan data')
         } finally {
             setLoading(false)
         }
