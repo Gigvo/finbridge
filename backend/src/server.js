@@ -4,7 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 
-const { registerHandler, loginHandler, meHandler } = require('./auth');
 const { getAuth, getDb } = require('./firebase');
 const { extractReceiptAmountFromImage, computeUmkmKpi } = require('./gemini');
 
@@ -50,10 +49,6 @@ async function requireFirebaseUser(req) {
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
-
-app.post('/api/auth/register', registerHandler);
-app.post('/api/auth/login', loginHandler);
-app.get('/api/auth/me', meHandler);
 
 // Gemini AI
 // Receipt endpoint supports:

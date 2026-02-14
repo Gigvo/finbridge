@@ -2,15 +2,10 @@
 
 Backend ada di folder `backend/` (terpisah dari Next.js di `frontend/`).
 
-## Auth (Firebase)
+## Firebase
 
-Backend ini pakai **Firebase Auth** dan **Firestore** untuk menyimpan profil + mapping `nik`.
-
-- Register: `POST /api/auth/register` dengan `fullName`, `nik`, `phone`, `email` (opsional)
-- Login helper: `POST /api/auth/login` dengan `nik` (mengembalikan `email` dan `phone`)
-- Me: `GET /api/auth/me` dengan header `Authorization: Bearer <Firebase ID Token>`
-
-Catatan: Autentikasi dilakukan via **Firebase Phone Auth (OTP)** di frontend. Backend tidak menerima password.
+Backend ini memakai **Firebase Admin** untuk verifikasi Firebase ID token yang dikirim frontend.
+Autentikasi dilakukan via **Firebase Phone Auth (OTP)** di frontend.
 
 ## Menjalankan
 
@@ -23,44 +18,12 @@ npm run dev
 
 Default jalan di `http://localhost:4010` (lihat `backend/.env`).
 
-## Contoh request
-
 ## Konfigurasi Firebase Admin
 
 Pilih salah satu:
 
 - Set env var `GOOGLE_APPLICATION_CREDENTIALS` ke path JSON service account, atau
 - Isi `.env` dengan `FIREBASE_SERVICE_ACCOUNT_JSON`.
-
-## Contoh request
-
-Register:
-
-```bash
-curl -X POST http://localhost:4000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d "{\"fullName\":\"Budi Santoso\",\"nik\":\"1234567890123456\",\"phone\":\"081234567890\",\"email\":\"user@example.com\"}"
-```
-
-Login:
-
-```bash
-curl -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"nik\":\"1234567890123456\"}"
-
-Me (butuh Firebase ID token dari frontend):
-
-```bash
-curl -X GET http://localhost:4000/api/auth/me \
-  -H "Authorization: Bearer <FIREBASE_ID_TOKEN>"
-```
-```
-
-## Storage
-
-- Profil user: Firestore collection `users/{uid}`
-- Index NIK: Firestore collection `nikIndex/{nik}` -> `{ uid, email, createdAt }`
 
 ## Gemini API
 
