@@ -20,18 +20,18 @@ export default function Navbar() {
             <div className='flex flex-row gap-5 items-center'>
                 <Link
                     href={'/'}
-                    className='hover:bg-blue-400 hover:text-white py-2 px-4 rounded-lg transition duration-150'
+                    className='hover:bg-black hover:text-white py-2 px-4 rounded-lg transition duration-150'
                 >
                     Dashboard
                 </Link>
                 <Link
-                    className='hover:bg-blue-400 hover:text-white py-2 px-4 rounded-lg transition duration-150'
+                    className='hover:bg-black hover:text-white py-2 px-4 rounded-lg transition duration-150'
                     href={'/fitur'}
                 >
                     Hubungkan Data
                 </Link>
                 <Link
-                    className='hover:bg-blue-400 hover:text-white py-2 px-4 rounded-lg transition duration-150'
+                    className='hover:bg-black hover:text-white py-2 px-4 rounded-lg transition duration-150'
                     href={'/cara-kerja'}
                 >
                     pembiayaan
