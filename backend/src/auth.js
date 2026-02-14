@@ -1,30 +1,28 @@
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
-const { listUsers, saveUsers } = require('./storage');
 const { isValidNik, isValidEmail, isValidPassword, pickAuthUser } = require('./validation');
+const { getAuth, getDb } = require('./firebase');
 
-function getJwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.trim().length < 16) {
-    throw new Error('JWT_SECRET belum diset atau terlalu pendek (min 16 karakter).');
-  }
-  return secret;
+function normalizeEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
 }
 
-function signToken(user) {
-  const secret = getJwtSecret();
-  return jwt.sign(
-    { nik: user.nik },
-    secret,
-    { subject: user.id, expiresIn: '7d' }
-  );
+function getBearerToken(req) {
+  const header = String(req.headers?.authorization ?? '');
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+  return token;
 }
 
-function registerHandler(req, res) {
+async function verifyIdToken(req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+
+  const auth = getAuth();
+  return auth.verifyIdToken(token);
+}
+
+async function registerHandler(req, res) {
   const nik = String(req.body?.nik ?? '').trim();
-  const email = String(req.body?.email ?? '').trim().toLowerCase();
+  const email = normalizeEmail(req.body?.email);
   const password = String(req.body?.password ?? '');
 
   if (!isValidNik(nik)) {
@@ -37,65 +35,98 @@ function registerHandler(req, res) {
     return res.status(400).json({ message: 'Password minimal 8 karakter.' });
   }
 
-  const users = listUsers();
-  const existingNik = users.find(u => u.nik === nik);
-  if (existingNik) {
-    return res.status(409).json({ message: 'NIK sudah terdaftar.' });
+  try {
+    const auth = getAuth();
+    const db = getDb();
+
+    // Ensure NIK unique (users/{uid} stores nik; and nikIndex/{nik} maps nik->uid)
+    const nikRef = db.collection('nikIndex').doc(nik);
+    const nikSnap = await nikRef.get();
+    if (nikSnap.exists) {
+      return res.status(409).json({ message: 'NIK sudah terdaftar.' });
+    }
+
+    // Create Firebase Auth user
+    const userRecord = await auth.createUser({
+      email,
+      password
+    });
+
+    const uid = userRecord.uid;
+    const createdAt = new Date().toISOString();
+
+    // Persist profile in Firestore
+    await db.collection('users').doc(uid).set({
+      nik,
+      email,
+      createdAt
+    }, { merge: true });
+
+    // Create index doc for nik
+    await nikRef.set({ uid, email, createdAt });
+
+    // Put nik on custom claims for convenience
+    await auth.setCustomUserClaims(uid, { nik });
+
+    return res.status(201).json({
+      user: pickAuthUser({ id: uid, nik, email, createdAt })
+    });
+  } catch (e) {
+    // Firebase errors are often rich; keep response minimal
+    const msg = String(e?.message || 'Gagal registrasi');
+    if (msg.includes('email-already-exists')) {
+      return res.status(409).json({ message: 'Email sudah terdaftar.' });
+    }
+    return res.status(500).json({ message: 'Gagal registrasi', detail: msg });
   }
-  const existingEmail = users.find(u => (u.email || '').toLowerCase() === email);
-  if (existingEmail) {
-    return res.status(409).json({ message: 'Email sudah terdaftar.' });
-  }
-
-  const passwordHash = bcrypt.hashSync(password, 10);
-  const user = {
-    id: crypto.randomUUID(),
-    nik,
-    email,
-    passwordHash,
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(user);
-  saveUsers(users);
-
-  const token = signToken(user);
-  return res.status(201).json({
-    user: pickAuthUser(user),
-    token
-  });
 }
 
-function loginHandler(req, res) {
+// NOTE: Firebase password verification is done by Firebase Client SDK (frontend),
+// so backend doesn't accept nik+password for login.
+// We provide a helper endpoint to resolve nik -> email so FE can sign-in with email.
+async function loginHandler(req, res) {
   const nik = String(req.body?.nik ?? '').trim();
-  const password = String(req.body?.password ?? '');
-
   if (!isValidNik(nik)) {
     return res.status(400).json({ message: 'NIK wajib 16 digit angka.' });
   }
-  if (typeof password !== 'string' || password.length === 0) {
-    return res.status(400).json({ message: 'Password wajib diisi.' });
-  }
 
-  const users = listUsers();
-  const user = users.find(u => u.nik === nik);
-  if (!user) {
-    return res.status(401).json({ message: 'NIK atau password salah.' });
+  try {
+    const db = getDb();
+    const nikSnap = await db.collection('nikIndex').doc(nik).get();
+    if (!nikSnap.exists) {
+      return res.status(401).json({ message: 'NIK tidak ditemukan.' });
+    }
+    const data = nikSnap.data() || {};
+    return res.status(200).json({
+      email: data.email
+    });
+  } catch (e) {
+    return res.status(500).json({ message: 'Gagal login', detail: String(e?.message || e) });
   }
+}
 
-  const ok = bcrypt.compareSync(password, user.passwordHash);
-  if (!ok) {
-    return res.status(401).json({ message: 'NIK atau password salah.' });
+async function meHandler(req, res) {
+  try {
+    const decoded = await verifyIdToken(req);
+    if (!decoded) return res.status(401).json({ message: 'Unauthorized' });
+
+    const uid = decoded.sub;
+    const db = getDb();
+    const userSnap = await db.collection('users').doc(uid).get();
+    const profile = userSnap.exists ? userSnap.data() : {};
+
+    return res.status(200).json({
+      uid,
+      nik: decoded.nik || profile?.nik || null,
+      email: decoded.email || profile?.email || null
+    });
+  } catch (e) {
+    return res.status(401).json({ message: 'Unauthorized', detail: String(e?.message || e) });
   }
-
-  const token = signToken(user);
-  return res.status(200).json({
-    user: pickAuthUser(user),
-    token
-  });
 }
 
 module.exports = {
   registerHandler,
-  loginHandler
+  loginHandler,
+  meHandler
 };
