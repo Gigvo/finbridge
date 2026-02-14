@@ -1,0 +1,353 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FinBridge.id API (MVP Simplified)",
+    "description": "API untuk MVP FinBridge dengan pendekatan validasi manual (Concierge MVP).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.finbridge.id/v1"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Registrasi User (Tanpa Auto Validasi NIK)",
+        "description": "User mendaftar dan input NIK. Validasi NIK dilakukan manual oleh admin di backend.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "password": { "type": "string" },
+                  "nik": { "type": "string", "description": "16 digit NIK" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          }
+        }
+      }
+    },
+    "/user/upload-identity": {
+      "post": {
+        "summary": "Upload Dokumen Identitas",
+        "tags": ["User Profile"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ktp_image": { "type": "string", "format": "binary" },
+                  "selfie_image": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Uploaded for admin review" }
+        }
+      }
+    },
+    "/data/upload-evidence": {
+      "post": {
+        "summary": "Upload Bukti Transaksi (Screenshot)",
+        "description": "Menggantikan integrasi API langsung. User upload screenshot struk/riwayat.",
+        "tags": ["Alternative Data"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "category": { 
+                    "type": "string", 
+                    "enum": ["electricity_bill", "ewallet_history"] 
+                  },
+                  "image_file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "Evidence uploaded. Status is pending until Admin verifies amount." 
+          }
+        }
+      }
+    },
+    "/scoring/dashboard": {
+      "get": {
+        "summary": "Get Credit Score & Recommendations",
+        "description": "Menampilkan skor HANYA JIKA admi{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FinBridge.id API (MVP Simplified)",
+    "description": "API untuk MVP FinBridge dengan pendekatan validasi manual (Concierge MVP).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.finbridge.id/v1"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Registrasi User (Tanpa Auto Validasi NIK)",
+        "description": "User mendaftar dan input NIK. Validasi NIK dilakukan manual oleh admin di backend.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "password": { "type": "string" },
+                  "nik": { "type": "string", "description": "16 digit NIK" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          }
+        }
+      }
+    },
+    "/user/upload-identity": {
+      "post": {
+        "summary": "Upload Dokumen Identitas",
+        "tags": ["User Profile"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ktp_image": { "type": "string", "format": "binary" },
+                  "selfie_image": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Uploaded for admin review" }
+        }
+      }
+    },
+    "/data/upload-evidence": {
+      "post": {
+        "summary": "Upload Bukti Transaksi (Screenshot)",
+        "description": "Menggantikan integrasi API langsung. User upload screenshot struk/riwayat.",
+        "tags": ["Alternative Data"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "category": { 
+                    "type": "string", 
+                    "enum": ["electricity_bill", "ewallet_history"] 
+                  },
+                  "image_file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { 
+            "description": "Evidence uploaded. Status is pending until Admin verifies amount." 
+          }
+        }
+      }
+    },
+    "/scoring/dashboard": {
+      "get": {
+        "summary": "Get Credit Score & Recommendations",
+        "description": "Menampilkan skor HANYA JIKA admin sudah memverifikasi data upload user.",
+        "tags": ["Scoring"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "score": { "type": "integer", "example": 650 },
+                    "risk_grade": { "type": "string", "example": "B" },
+                    "status": { "type": "string", "example": "calculated" },
+                    "recommendations": { 
+                      "type": "string", 
+                      "example": "Pertahankan pembayaran listrik 3 bulan ke depan." 
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Data belum diverifikasi admin, skor belum tersedia."
+          }
+        }
+      }
+    },
+    "/partners": {
+      "get": {
+        "summary": "Get Partner Catalog",
+        "description": "List mitra (Koperasi/Fintech) yang tersedia untuk dipilih user.",
+        "tags": ["Marketplace"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "name": { "type": "string" },
+                      "interest_desc": { "type": "string" },
+                      "logo_url": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loans/apply": {
+      "post": {
+        "summary": "Apply Loan to Specific Partner",
+        "tags": ["Loans"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "partner_id": { "type": "integer" },
+                  "amount": { "type": "number" },
+                  "tenor": { "type": "integer" },
+                  "contact_method": { "type": "string", "enum": ["WA", "Call"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application sent to partner dashboard. Partner will contact offline."
+          }
+        }
+      }
+    }
+  }
+}n sudah memverifikasi data upload user.",
+        "tags": ["Scoring"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "score": { "type": "integer", "example": 650 },
+                    "risk_grade": { "type": "string", "example": "B" },
+                    "status": { "type": "string", "example": "calculated" },
+                    "recommendations": { 
+                      "type": "string", 
+                      "example": "Pertahankan pembayaran listrik 3 bulan ke depan." 
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Data belum diverifikasi admin, skor belum tersedia."
+          }
+        }
+      }
+    },
+    "/partners": {
+      "get": {
+        "summary": "Get Partner Catalog",
+        "description": "List mitra (Koperasi/Fintech) yang tersedia untuk dipilih user.",
+        "tags": ["Marketplace"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "name": { "type": "string" },
+                      "interest_desc": { "type": "string" },
+                      "logo_url": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loans/apply": {
+      "post": {
+        "summary": "Apply Loan to Specific Partner",
+        "tags": ["Loans"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "partner_id": { "type": "integer" },
+                  "amount": { "type": "number" },
+                  "tenor": { "type": "integer" },
+                  "contact_method": { "type": "string", "enum": ["WA", "Call"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application sent to partner dashboard. Partner will contact offline."
+          }
+        }
+      }
+    }
+  }
+}
