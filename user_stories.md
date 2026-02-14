@@ -1,115 +1,265 @@
-# User Stories & Functional Requirements - FinBridge.id (MVP)
+# FinBridge.id - MVP Technical Specification (Hybrid Architecture)
 
-**Version:** 1.0 (Simplified MVP)  
-**Database Strategy:** SQLite  
-**Integration Strategy:** Manual Verification (Concierge Model)  
-
----
-
-## 🎭 Actor: Peminjam (Borrower/UMKM)
-
-### 1. Registrasi & Identitas
-**US-01: Registrasi Akun**
-> "Sebagai **Peminjam**, saya ingin **mendaftar akun menggunakan Email dan NIK**, agar data saya tercatat di sistem."
-* **Acceptance Criteria:**
-  * User dapat menginput Nama Lengkap, Email, No HP, Password, dan NIK (16 digit).
-  * Sistem memvalidasi format email dan panjang NIK (validasi format saja, bukan ke Dukcapil).
-  * Akun terbentuk dengan status `account_status: pending`.
-* **API Endpoint:** `POST /api/auth/register`
-
-**US-02: Upload Dokumen Identitas**
-> "Sebagai **Peminjam**, saya ingin **mengunggah foto KTP dan Selfie**, agar admin dapat memverifikasi keaslian identitas saya."
-* **Acceptance Criteria:**
-  * User dapat mengunggah 2 file gambar (KTP & Selfie).
-  * Sistem menyimpan file di folder lokal server dan path-nya di database.
-  * User mendapat notifikasi "Sedang diverifikasi admin".
-* **API Endpoint:** `POST /api/user/upload-identity`
+**Version:** 2.0 (AI-Integrated Hybrid Model)  
+**Date:** October 2023  
+**Status:** Ready for Development  
 
 ---
 
-### 2. Pengumpulan Data Alternatif (Scoring Data)
-*Pada fase ini, user mengupload bukti visual, bukan koneksi API.*
+## 🏗 Architecture Overview
 
-**US-03: Upload Bukti Tagihan Utilitas**
-> "Sebagai **Peminjam**, saya ingin **mengunggah foto struk/meteran Listrik atau Air**, sebagai bukti pengeluaran rutin."
-* **Acceptance Criteria:**
-  * User memilih kategori (Listrik/Air).
-  * User mengunggah foto bukti bayar.
-  * Status data tersimpan sebagai `verification_status: pending`.
-* **API Endpoint:** `POST /api/data/upload-evidence` (Category: `electricity_bill`)
+Sistem ini menggunakan pendekatan **Hybrid** untuk memisahkan tanggung jawab Frontend dan Backend secara jelas, sesuai persyaratan Hackathon:
 
-**US-04: Upload Bukti Keuangan Digital**
-> "Sebagai **Peminjam**, saya ingin **mengunggah screenshot riwayat E-wallet (GoPay/OVO/ShopeePay)**, sebagai bukti cashflow usaha."
-* **Acceptance Criteria:**
-  * User memilih kategori E-wallet.
-  * User mengunggah screenshot halaman profil/riwayat transaksi.
-  * User melihat pesan bahwa data akan divalidasi manual dalam 1x24 jam.
-* **API Endpoint:** `POST /api/data/upload-evidence` (Category: `ewallet_history`)
+1.  **Frontend (Next.js):** Menangani UI, Autentikasi User (via Firebase SDK), dan Upload File fisik (via Firebase Storage).
+2.  **Backend (Node.js/Express):** Menangani Logika Bisnis, Integrasi AI (Gemini), dan penulisan data sensitif ke Database.
+3.  **Services:**
+    * **Auth:** Firebase Authentication.
+    * **Database:** Cloud Firestore.
+    * **Storage:** Cloud Storage for Firebase.
+    * **AI:** Google Gemini API (untuk OCR & Scoring).
 
 ---
 
-### 3. Credit Scoring & Dashboard
-**US-05: Melihat Skor Kredit**
-> "Sebagai **Peminjam**, saya ingin **melihat Skor Kredit dan Level Risiko saya**, setelah data saya diverifikasi admin."
-* **Acceptance Criteria:**
-  * Jika status verifikasi masih `pending`, skor tidak muncul (tampil pesan "Menunggu Verifikasi").
-  * Jika status `verified`, skor (300-900) dan Grade (A-E) ditampilkan.
-  * Skor dihitung otomatis berdasarkan angka yang diinput Admin dari bukti foto user.
-* **API Endpoint:** `GET /api/scoring/dashboard`
+## 👤 User Stories & Functional Requirements
 
-**US-06: Rekomendasi Perbaikan**
-> "Sebagai **Peminjam**, saya ingin **mendapat tips cara menaikkan skor**, agar saya bisa mendapatkan akses pinjaman yang lebih baik."
+Berikut adalah daftar fitur dari perspektif pengguna dan endpoint API Backend yang terlibat.
+
+### 1. Registrasi & Sinkronisasi Profil
+*Tujuan: Memastikan data user tersimpan di Database Backend setelah login di Frontend.*
+
+**US-01: Sinkronisasi Profil Pengguna**
+> "Sebagai **Peminjam**, saya ingin **menyimpan data diri lengkap (Nama, NIK, Lokasi Usaha)** setelah mendaftar, agar profil saya tercatat di sistem backend."
+
+* **Alur Teknis:**
+    1.  Frontend melakukan registrasi user menggunakan **Firebase Auth SDK**.
+    2.  Setelah sukses, Frontend mendapatkan `idToken` (JWT).
+    3.  Frontend mengirim data profil tambahan ke Backend melalui API.
+    4.  Backend memvalidasi token dan menyimpan data ke Firestore.
 * **Acceptance Criteria:**
-  * Menampilkan teks statis atau dinamis sederhana (misal: "Lengkapi bukti pembayaran listrik bulan lalu").
-* **API Endpoint:** `GET /api/scoring/dashboard` (field: `recommendations`)
+    * User berhasil login di aplikasi.
+    * Data profil muncul di koleksi Firestore `users`.
+* **🔌 API Endpoint:** `POST /api/v1/users/sync`
 
 ---
 
-### 4. Marketplace Pinjaman
-**US-07: Katalog Mitra (Lender)**
-> "Sebagai **Peminjam**, saya ingin **melihat daftar Mitra (Koperasi/BPR)** yang tersedia, agar saya bisa memilih pemberi pinjaman yang cocok."
-* **Acceptance Criteria:**
-  * Menampilkan list mitra (Logo, Nama, Bunga, Syarat).
-  * Data mitra diambil dari tabel `partners` di SQLite.
-* **API Endpoint:** `GET /api/partners`
+### 2. AI Credit Scoring (Main Process)
+*Tujuan: Menggunakan AI untuk membaca bukti keuangan dan memberikan skor kredit.*
 
-**US-08: Pengajuan Minat (Apply)**
-> "Sebagai **Peminjam**, saya ingin **mengirimkan profil saya ke Mitra pilihan**, untuk mengajukan pinjaman."
+**US-02: Upload Bukti & Analisa AI**
+> "Sebagai **Peminjam**, saya ingin **mengunggah foto tagihan (Listrik/E-wallet)** dan mendapatkan **hasil analisa otomatis**, agar saya tahu nilai kredit saya tanpa menunggu verifikasi manual."
+
+* **Alur Teknis:**
+    1.  User upload foto ke **Firebase Storage** via Frontend (mendapatkan `downloadURL`).
+    2.  Frontend memanggil API Backend dengan membawa `downloadURL`.
+    3.  Backend mengirim URL gambar ke **Gemini API** dengan prompt khusus.
+    4.  Backend menerima hasil ekstraksi (JSON), menghitung skor, dan update Database.
 * **Acceptance Criteria:**
-  * User memilih Mitra, input Jumlah Pinjaman dan Tenor.
-  * User memilih preferensi kontak (WhatsApp/Telepon).
-  * Data tersimpan di tabel `loan_applications`.
-  * User mendapat notifikasi "Pengajuan terkirim, Mitra akan menghubungi Anda".
-* **API Endpoint:** `POST /api/loans/apply`
+    * Gemini berhasil mengekstrak nominal uang dari gambar.
+    * Skor kredit user diperbarui di database.
+    * Frontend menerima respon berisi skor baru dan rekomendasi.
+* **🔌 API Endpoint:** `POST /api/v1/scoring/analyze`
+
+**US-03: Dashboard Skor Kredit**
+> "Sebagai **Peminjam**, saya ingin **melihat Skor Kredit dan Level Risiko saya**, agar saya paham posisi keuangan saya."
+
+* **Alur Teknis:**
+    * Frontend bisa mengambil data ini secara *real-time* via Firebase SDK (Read-Only) atau request ke Backend (jika perlu data olahan).
+* **Acceptance Criteria:**
+    * Menampilkan Skor (300-900), Risk Grade (A-E), dan Rekomendasi AI.
 
 ---
 
-## 👮 Actor: Admin (Back-Office)
-*Peran krusial dalam "Concierge MVP"*
+### 3. Marketplace Pinjaman
+*Tujuan: Menghubungkan user yang sudah dinilai dengan mitra keuangan.*
 
-### 1. Verifikasi Manual
-**US-09: Verifikasi Identitas User**
-> "Sebagai **Admin**, saya ingin **melihat foto KTP user dan membandingkannya dengan inputan NIK**, untuk mengaktifkan akun user."
-* **Acceptance Criteria:**
-  * Admin melihat list user `pending`.
-  * Admin bisa klik `Approve` (ubah status jadi `verified`) atau `Reject`.
+**US-04: Katalog Mitra**
+> "Sebagai **Peminjam**, saya ingin **melihat daftar Mitra Keuangan** yang tersedia, agar saya bisa memilih pemberi pinjaman."
 
-**US-10: Input Data Keuangan (Data Entry)**
-> "Sebagai **Admin**, saya ingin **melihat gambar struk user dan menginput nominal Rupiah-nya**, agar sistem bisa menghitung skor."
+* **Alur Teknis:**
+    * Frontend meminta daftar mitra aktif ke Backend.
+* **🔌 API Endpoint:** `GET /api/v1/partners`
+
+**US-05: Pengajuan Pinjaman (Apply)**
+> "Sebagai **Peminjam**, saya ingin **mengajukan pinjaman ke Mitra pilihan**, dengan menyertakan skor kredit saya."
+
+* **Alur Teknis:**
+    1.  User memilih mitra dan mengisi formulir pengajuan.
+    2.  Frontend mengirim data ke Backend.
+    3.  Backend memvalidasi apakah skor user memenuhi syarat mitra tersebut.
+    4.  Backend menyimpan pengajuan ke koleksi `loan_applications`.
 * **Acceptance Criteria:**
-  * Admin melihat gambar bukti (misal: Screenshot GoPay).
-  * Admin mengetik angka (misal: 1.500.000) ke kolom `admin_verified_amount`.
-  * Saat Admin menyimpan, status data berubah jadi `verified`.
-  * Trigger: Sistem backend otomatis menghitung ulang skor user saat data ini disimpan.
+    * Pengajuan tersimpan dengan status `submitted`.
+    * Validasi gagal jika skor terlalu rendah.
+* **🔌 API Endpoint:** `POST /api/v1/loans/apply`
 
 ---
 
-## 🤝 Actor: Mitra (Lender)
-*Versi MVP: Mitra hanya menerima notifikasi/data, proses lanjut di luar sistem.*
+## 📜 API Contract (OpenAPI Specification)
 
-**US-11: Melihat Daftar Pelamar (Leads)**
-> "Sebagai **Mitra**, saya ingin **melihat daftar user yang mengajukan pinjaman ke lembaga saya**, lengkap dengan skor kreditnya."
-* **Acceptance Criteria:**
-  * Mitra melihat tabel berisi: Nama, No HP, Skor FinBridge, Jumlah Pengajuan.
-  * Mitra bisa mengubah status aplikasi menjadi `Approved in Principle` atau `Rejected`.
-* **API Endpoint:** `GET /api/partner/applications`
+Berikut adalah kontrak komunikasi antara Frontend (Next.js) dan Backend (Express). Frontend wajib menyertakan Header `Authorization: Bearer <firebase_token>` pada setiap request.
+
+```json
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FinBridge.id API (Hybrid Architecture)",
+    "description": "API Specification for FinBridge MVP. Frontend connects to Express Backend via REST, Backend connects to Gemini & Firestore.",
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://<your-cloud-run-url>/api/v1",
+      "description": "Production Server (Cloud Run)"
+    },
+    {
+      "url": "http://localhost:8080/api/v1",
+      "description": "Local Development"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "firebaseAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Firebase ID Token sent in Authorization header"
+      }
+    }
+  },
+  "paths": {
+    "/users/sync": {
+      "post": {
+        "summary": "Sync User Profile",
+        "description": "Save user profile to Firestore after Firebase Auth registration.",
+        "security": [{ "firebaseAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["full_name", "nik", "infographic_location"],
+                "properties": {
+                  "full_name": { "type": "string" },
+                  "nik": { "type": "string", "example": "3201123456789000" },
+                  "infographic_location": { "type": "string", "example": "Sleman" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Profile synced successfully" },
+          "401": { "description": "Unauthorized (Invalid Token)" }
+        }
+      }
+    },
+    "/scoring/analyze": {
+      "post": {
+        "summary": "AI Scoring Analysis (Main Process)",
+        "description": "Send image URL to Backend. Backend calls Gemini AI to extract data and calculate score.",
+        "security": [{ "firebaseAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["evidence_type", "image_url"],
+                "properties": {
+                  "evidence_type": { 
+                    "type": "string", 
+                    "enum": ["electricity_bill", "ewallet_history"] 
+                  },
+                  "image_url": { 
+                    "type": "string", 
+                    "description": "Public/Signed URL from Firebase Storage" 
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Analysis successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "ai_analysis": {
+                      "type": "object",
+                      "properties": {
+                        "detected_amount": { "type": "number" },
+                        "is_valid": { "type": "boolean" }
+                      }
+                    },
+                    "new_credit_score": { "type": "integer", "example": 720 },
+                    "risk_grade": { "type": "string", "example": "Low" },
+                    "recommendation": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners": {
+      "get": {
+        "summary": "Get Partner Catalog",
+        "description": "Retrieve list of active financial partners.",
+        "security": [{ "firebaseAuth": [] }],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "name": { "type": "string" },
+                      "interest_display": { "type": "string" },
+                      "logo_url": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loans/apply": {
+      "post": {
+        "summary": "Apply for Loan",
+        "description": "Submit loan application to a specific partner.",
+        "security": [{ "firebaseAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["partner_id", "amount", "tenor"],
+                "properties": {
+                  "partner_id": { "type": "string" },
+                  "amount": { "type": "number", "example": 5000000 },
+                  "tenor": { "type": "integer", "example": 6 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Application submitted" },
+          "400": { "description": "Credit score too low or invalid input" }
+        }
+      }
+    }
+  }
+}
